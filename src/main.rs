@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{env, fs, process};
 
+mod assertions;
+
 #[derive(Debug, Serialize, Deserialize)]
 struct ContentItem {
     text: String,
@@ -42,7 +44,7 @@ struct Judgement {
     message: String,
 }
 
-fn judge_score(code: &String, assertions: Vec<&str>) -> Result<Judgement> {
+fn judge_score(code: &String, assertions: [&str; 18]) -> Result<Judgement> {
     let mut fenced_code = String::from("```");
     fenced_code.push_str(code);
     fenced_code.push_str("```");
@@ -93,17 +95,7 @@ fn main() -> Result<()> {
         }
     };
 
-    let assertions = vec![
-        "Each class should have only one reason to change, meaning it should have only one job or responsibility.",
-        "Classes should be open for extension but closed for modification. New functionality should be added by extending the class, not by modifying existing code.",
-        "Objects of a superclass should be replaceable with objects of a subclass without affecting the correctness of the program.",
-        "Clients should not be forced to depend on interfaces they do not use. Interfaces should be specific to the needs of the client.",
-        "High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details. Details should depend on abstractions.",
-        "Code should be readable and self-documenting, with meaningful names and clear structure, reducing the need for excessive comments.",
-    ];
-
-
-    let result = judge_score(&code, assertions);
+    let result = judge_score(&code, assertions::ASSERTIONS);
     match result {
         Ok(judgement) => println!(
             "========= Result =======\nMessage: {}\n\nScore: {}{}{}\n",
