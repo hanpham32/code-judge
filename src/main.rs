@@ -80,7 +80,7 @@ const RESET: &str = "\x1b[0m";
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <code_file>", args[0]);
+        eprintln!("Usage: {} <code_file_or_directory>", args[0]);
         process::exit(1);
     }
 
