@@ -1,3 +1,5 @@
+# Steps
+
 1. Project Setup
 
    Step: Initialize a new Rust project using Cargo.
@@ -95,3 +97,21 @@
     Generate project documentation using cargo doc and verify it is accessible.
     Write a README.md file with installation instructions and examples.
     Package the project as a Cargo crate and verify it can be installed and run by other users.
+
+# Engineering conventions
+
+## Conventions
+
+> When writing code, follow these conventions.
+
+- Write simple, verbose code over terse, compact, dense code.
+- If a function does not have a corresponding test, mention it.
+- When building tests, don't mock anything.
+- If a well-supported library exists to do a thing, use the library versus rebuilding the functionality.
+- Keep README.md updated as the tech stack evolves. If a README file is not provided, please ask.
+- Go a little overboard on documentation.
+
+## Tech stack
+
+- Use Rust for the language
+- Use crate as the package manager

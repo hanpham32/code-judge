@@ -1,9 +1,27 @@
 use anyhow::Result;
+use clap::Parser;
+use colored::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{env, fs, process};
+use std::{fs, process};
+use tracing::info;
 
+mod analyzer;
 mod assertions;
+
+use analyzer::{Analyzer, IssueType};
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClaudeResponse {
+    content: Vec<ContentItem>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ContentItem {
@@ -12,9 +30,13 @@ struct ContentItem {
     content_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ClaudeResponse {
-    content: Vec<ContentItem>,
+struct Judgement {
+    score: f64,
+    message: String,
+}
+
+fn setup_logging() {
+    tracing_subscriber::fmt::init();
 }
 
 fn get_claude_response(prompt: &str) -> Result<String> {
@@ -39,12 +61,7 @@ fn get_claude_response(prompt: &str) -> Result<String> {
     Ok(response.content.remove(0).text)
 }
 
-struct Judgement {
-    score: f64,
-    message: String,
-}
-
-fn judge_score(code: &String, assertions: [&str; 18]) -> Result<Judgement> {
+fn judge_score(code: &str, assertions: [&str; 18]) -> Result<Judgement> {
     let mut fenced_code = String::from("```");
     fenced_code.push_str(code);
     fenced_code.push_str("```");
@@ -77,34 +94,83 @@ const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
+fn analyze_code(
+    code: String,
+    assertions: [&str; 18],
+) -> Result<(Judgement, Vec<analyzer::CodeIssue>)> {
+    let judgement = judge_score(&code, assertions)?;
+
+    let analyzer = Analyzer::new(code.to_string());
+    let issues = analyzer.analyze()?;
+
+    Ok((judgement, issues))
+}
+
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: {} <code_file_or_directory>", args[0]);
-        process::exit(1);
-    }
+    setup_logging();
+    let args = Args::parse();
 
-    let file_path = &args[1];
+    info!("Starting code-judge");
+    println!("{}", "Code Judge is running!".green());
 
-    // let code = include_str!("../data/code.cs");
-    let code = match fs::read_to_string(file_path) {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("Error reading file '{}': {}", file_path, e);
-            process::exit(1);
-        }
-    };
+    if let Some(path) = args.path {
+        println!("Reading path: {}", path.blue());
 
-    let result = judge_score(&code, assertions::ASSERTIONS);
-    match result {
-        Ok(judgement) => println!(
-            "========= Result =======\nMessage: {}\n\nScore: {}{}{}\n",
+        let code = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("Error reading file '{}': {}", path, e);
+                process::exit(1);
+            }
+        };
+
+        let (judgement, issues) = analyze_code(code, assertions::ASSERTIONS)?;
+
+        println!(
+            "\n========= AI Evaluation =======\nMessage: {}\n\nScore: {}{}{}\n",
             judgement.message,
             if judgement.score < 2.0 { RED } else { GREEN },
             judgement.score,
             RESET
-        ),
-        Err(e) => eprintln!("Error: {}", e),
+        );
+
+        if !issues.is_empty() {
+            println!("\n========= Static Analysis =======");
+            for issue in issues {
+                let color = match issue.issue_type {
+                    IssueType::Todo => "blue",
+                    IssueType::StyleIssue => "orange",
+                    IssueType::PotentialBug => "red",
+                    IssueType::Performance => "pink",
+                };
+                println!(
+                    "Line {}: {}",
+                    issue.line_number.to_string().cyan(),
+                    issue.message.color(color)
+                );
+            }
+        }
     }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dependencies_load() {
+        assert!(true);
+    }
+
+    #[test]
+    fn test_analyze_code() -> Result<()> {
+        let code = "fn main() {\n    // TODO: Implement this very long line that should trigger a length warning in our analysis\n}".to_string();
+        let analyzer = Analyzer::new(code);
+        let issues = analyzer.analyze()?;
+
+        assert_eq!(issues.len(), 1);
+        Ok(())
+    }
 }
