@@ -8,6 +8,8 @@ use tracing::info;
 
 mod analyzer;
 mod assertions;
+mod character;
+mod model;
 
 use analyzer::{Analyzer, IssueType};
 
